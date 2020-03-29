@@ -1,0 +1,595 @@
+#!/usr/bin/env bash
+
+################################################################################
+# @ddblock_begin copyright
+#
+# Copyright (c) 1999-2013
+# Maryland DSPCAD Research Group, The University of Maryland at College Park 
+# All rights reserved.
+
+# IN NO EVENT SHALL THE UNIVERSITY OF MARYLAND BE LIABLE TO ANY PARTY
+# FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES
+# ARISING OUT OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF
+# THE UNIVERSITY OF MARYLAND HAS BEEN ADVISED OF THE POSSIBILITY OF
+# SUCH DAMAGE.
+#
+# THE UNIVERSITY OF MARYLAND SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+# INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE. THE SOFTWARE
+# PROVIDED HEREUNDER IS ON AN "AS IS" BASIS, AND THE UNIVERSITY OF
+# MARYLAND HAS NO OBLIGATION TO PROVIDE MAINTENANCE, SUPPORT, UPDATES,
+# ENHANCEMENTS, OR MODIFICATIONS.
+# 
+# @ddblock_end copyright
+################################################################################
+
+################################################################################
+# Environment variable definitions that are specific to this sub-package
+################################################################################
+
+################################################################################
+# Function ddblock_diagnostic
+################################################################################
+# @ddblock_begin doc_ddblock_diagnostic
+#
+# \ddcommand{ddblock_diagnostic}
+#
+# \ddcode{ddblock_diagnostic}: Print diagnostic information if the
+# environmental variable \ddcode{UXVERBOSE} is a non-empty
+# string. This function allows printing messages having multiple
+# lines.
+#
+# \ddusage{ddblock_diagnostic [<message1>, <message2>, ...]}
+# 
+# All the arguments are treated as part of the message to be printed.
+#
+# @ddblock_end doc_ddblock_diagnostic
+################################################################################
+function ddblock_diagnostic {
+    if [ $# -eq 0 ]; then
+	echo ddblock_diagnostic error: arg count. 1>&2
+	exit 1
+    fi
+
+    if [ -n "$UXVERBOSE" ]; then
+	echo "$@"
+    fi
+}
+
+################################################################################
+# Function ddblock_usage
+################################################################################
+# @ddblock_begin doc_ddblock_usage
+#
+# \ddcommand{ddblock_usage}
+#
+# \ddcode{ddblock_usage}: Print the usage information for the
+# \ddcode{ddblock} script.
+#
+# \ddusage{ddblock_usage <temppath>}
+# 
+# The argument <temppath> is the root of the directory tree, where
+# backup files are saved.
+#
+# @ddblock_end doc_ddblock_usage
+################################################################################
+function ddblock_usage {
+    if [ $# -eq 0 ]; then
+	echo ddblock_usage error: arg count. 1>&2
+	exit 1
+    fi
+
+    echo ""
+    echo "ddblock <mode> <tag> [<tag1>, <tag2>, ...] <target>"
+    echo ""
+    echo "<mode> can be one of the following:"
+    echo "    extract        - extracts ddblocks having the label <tag> in the"
+    echo "                     <target> and print to stdout"
+    echo "    extract_prefix - extracts ddblocks having the label beginning with"
+    echo "                     <tag> in the <target> and print to stdout."
+    echo "    replace        - replace ddblocks in <target> having the label"
+    echo "                     <tag> from the entries found in UXBLOCKPATH;"
+    echo "                     backup copies are saved to: "$1""
+    echo ""
+    echo "If there are more than one tags specified, tags are processed in the"
+    echo "specified order."
+    echo ""
+    echo "If <target> is a directory, then all file in the directory tree rooted"
+    echo "<target> are processed for the given mode and tags."
+    echo ""
+
+    exit 0
+}
+
+################################################################################
+# Function ddblockex
+################################################################################
+# @ddblock_begin doc_ddblockex
+#
+# \ddcommand{ddblockex}
+#
+# \ddcode{ddblockex}: Extract \ddcode{ddblock} with the specified tag
+# from a file.
+#
+# \ddusage{ddblockex <filename> <tag> [<extract_prefix>]}
+
+# Extract \ddcode{ddblock} with the specified tag from a file. The
+# extracted block is printed to standard output. The specified
+# \ddcode{filename} must be a valid path to a regular file. It should
+# not begin with a dot ("."), contain "/.", terminate with "~", or
+# have ".bak" extension.
+#
+# The specified \ddcode{tag} is a non-null string that is used to
+# search the corresponding \ddcode{ddblock}. If the optional argument
+# \ddcode{extract_prefix} is \ddcode{true}, then the specified
+# \ddcode{tag} is used as a prefix-matching pattern. In this case, all
+# the blocks that have tags beginning with the specified \ddcode{tag}
+# are processed.
+#
+# @ddblock_end doc_ddblockex
+################################################################################
+function ddblockex {
+    if [[ $# -lt 2 || $# -gt 3 ]]; then
+	echo ddblockex error: arg count. 1>&2
+	exit 1
+    fi
+
+    FILE=$1
+    TAG=$2
+    EXTRACT_PREFIX=""
+    if [ $# -gt 2 ]; then
+	EXTRACT_PREFIX=$3
+    fi
+
+    DDBEGIN_TAG=""
+    DDEND_TAG=""
+    declare -a DDBEGIN_NUM
+    declare -a DDEND_NUM
+
+    # The specified file must be a valid path to a regular file. It
+    # should not begin with a dot ("."), contain "/.", terminate with
+    # "~", or have ".bak" extension.
+    if ! [[ $FILE == "."* || $FILE == *"/."* || $FILE == *"~" || $FILE == *".bak" ]]; then
+	# Ensure that FILE is a regular file and not a directory.
+	if [ -d $FILE ]; then
+	    echo Error: $FILE should be a regular file, and not a directory. 1>&2
+	    exit 1
+	fi
+
+	# Get line numbers corresponding to a match @ddblock_begin
+	# [tag] and @ddblock_end [tag], depending upon whether exact
+	# match or prefix match is needed for the specified tag. The
+	# resultant arrays DDBEGIN_NUM and DDEND_NUM will have sizes
+	# greater than 1 if there are multiple instances of
+	# @ddblock_begin [tag] and @ddblock_end [tag] pairs.
+	DDBEGIN_TAG="@ddblock_begin "$TAG
+	DDEND_TAG="@ddblock_end "$TAG
+	if [ "$EXTRACT_PREFIX" == "true" ]; then
+	    DDBEGIN_NUM=( `grep -n "${DDBEGIN_TAG}" $FILE | cut -d ':' -f 1` )
+	    DDEND_NUM=( `grep -n "${DDEND_TAG}" $FILE | cut -d ':' -f 1` )
+	else
+	    DDBEGIN_NUM=( `grep -nw "${DDBEGIN_TAG}" $FILE | cut -d ':' -f 1` )
+	    DDEND_NUM=( `grep -nw "${DDEND_TAG}" $FILE | cut -d ':' -f 1` )
+	fi
+
+	ddblock_diagnostic "Found @ddblock_begin "$TAG" here: "${DDBEGIN_NUM[*]}""
+	ddblock_diagnostic "Found @ddblock_begin "$TAG" here: "${DDEND_NUM[*]}""
+
+	# Check that the number of @ddblock_begin instances matches
+	# that of @ddblock_end instances for the specified tag. Exit
+	# if either @ddblock_begin or @ddblock_end keywords are
+	# missing.
+
+	if [ ${#DDBEGIN_NUM[@]} -lt ${#DDEND_NUM[@]} ]; then
+	    echo "Error: Missing @ddblock_begin "$TAG"" 1>&2
+	    exit 1
+	fi
+
+	if [ ${#DDBEGIN_NUM[@]} -gt ${#DDEND_NUM[@]} ]; then
+	    echo "Error: Missing @ddblock_end "$TAG""  1>&2
+	    exit 1
+	fi
+
+	# Check if there is at least one @ddblock_begin and
+	# @ddblock_end pair.
+	if [ ${#DDBEGIN_NUM[@]} -eq 0 ]; then
+	     echo Warning: No match found for $TAG
+	else
+	    # Loop through multiple instances of @ddblock pairs and
+	    # sequentially extract the text between each valid pair of
+	    # @ddblock_begin and @ddblock_end instances.
+	    for (( i = 0; i < ${#DDBEGIN_NUM[@]}; i++ )); do
+		BEGIN=${DDBEGIN_NUM[$i]}
+		END=${DDEND_NUM[$i]}
+
+       	        # Check that the line containing an instance of
+	        # @ddblock_begin is before the one containing the
+	        # instance of @ddblock_end.
+		if [ $BEGIN -ge $END ]; then
+		    echo "Error: @ddblock_begin "$TAG" appears before @ddblock_end "$TAG"" 1>&2
+		    exit 1
+		fi
+
+	        # Extract the text between @ddblock_begin and
+	        # @ddblock_end pair (exluding tags). Also, print text
+	        # before and after the extracted block.
+		
+		ddblock_diagnostic ""
+		ddblock_diagnostic "--- Text prior to the block ---"
+		BEFORE_TEXT=`head -n $BEGIN $FILE`
+		ddblock_diagnostic "$BEFORE_TEXT"
+
+		ddblock_diagnostic "--- The block ---"
+                # Always print the extracted block to stdout.
+		head -n $(( $END - 1 )) $FILE | tail -n +$(( $BEGIN + 1 )) | cat
+
+		ddblock_diagnostic "--- Text after the block ---"
+		AFTER_TEXT=`tail -n +$END $FILE`
+		ddblock_diagnostic "$AFTER_TEXT"
+	    done
+	fi
+    elif [[ $FILE == "."* ]]; then
+	echo "Warning: Ignoring target "$FILE""
+	echo The target name or path should not contain "/."
+    elif [[ $FILE == "."* ]]; then
+	echo "Warning: Ignoring target "$FILE""
+	echo The target name or path should not have a "." at the beginning.
+    elif [[ $FILE == *"~" ]]; then
+	echo "Warning: Ignoring target "$FILE""
+	echo The target name or path should not have a "~" at the end.
+    else
+	echo "Warning: Ignoring target "$FILE""
+	echo The target should not be a ".bak" file.
+    fi
+}
+
+################################################################################
+# Function ddblockup
+################################################################################
+# @ddblock_begin doc_ddblockup
+#
+# \ddcommand{ddblockup}
+#
+# \ddcode{ddblockup}: Update a \ddcode{ddblock} having the specified
+# tag in the specified file with the replacement block from the
+# appropriate file in the specified directory.
+#
+# \ddusage{ddblockup <filename> <tag> <blockpath> <backuppath>}
+#
+# Replace the \ddcode{ddblock} having the specified tag in the given
+# file with that from the specified \ddcode{blockpath}. The directory
+# \ddcode{blockpath} must contain a file \ddcode{<tag>-<ext>.txt},
+# where \ddblock{tag} is the specified tag, and \ddblock{ext} is the
+# extension of the specified \ddcode{filename}. If the
+# \ddcode{filename} does not have any extension, it is treated as a
+# shell script file and \ddcode{ext} is set to \ddcode{sh}.
+#
+# The specified \ddcode{filename} must be a valid path to a regular
+# file. It should not begin with a dot ("."), contain "/.", terminate
+# with "~", or have ".bak" extension.
+#
+# The specified \ddcode{tag} is a valid string that is used to search
+# the corresponding \ddcode{ddblock}. This function updates multiple
+# instances of ddblocks with the specified \ddcode{tag}. If there are
+# nested ddblocks, then the file is processed starting with the first
+# instance of \ddcode{@ddblock_begin <tag>} and so on. This can result
+# is unexpected behavior.
+#
+# While the original file is modified, back up files are created in
+# the directory tree rooted at \ddcode{backuppath}
+#
+# @ddblock_end doc_ddblockup
+################################################################################
+function ddblockup {
+    if [ $# -ne 4 ]; then
+	echo ddblockup error: arg count. 1>&2
+	exit 1
+    fi
+
+    FILE=$1
+    TAG=$2
+    BLOCKPATH=$3
+    TMPPATH=$4
+    DDBEGIN_TAG=""
+    DDEND_TAG=""
+    declare -a DDBEGIN_NUM
+    declare -a DDEND_NUM
+
+    # Get the FILE extention
+    EXT=`dxext $FILE`
+
+    # The specified file must be a valid path to a regular file. It
+    # should not begin with a dot ("."), contain "/.", terminate with
+    # "~", or have ".bak" extension.
+    if ! [[ $FILE == "."* || $FILE == *"/."* || $FILE == *"~" || $FILE == *".bak" ]]; then
+	# Ensure that FILE is a regular file and not a directory.
+	if [ -d $FILE ]; then
+	    echo Error: $FILE should be a regular file, and not a directory. 1>&2
+	    exit 1
+	fi
+
+	# DICE convention is not to have any extension to bash
+	# scripts. Check if EXT is not set, which will imply a bash
+	# script.
+	if [ -z $EXT ]; then
+	    EXT="sh"
+	fi
+
+	# Get the file containing the updated block, if it exists.
+	BLOCKFILE=""$TAG"-"$EXT".txt"
+	dxpushd $BLOCKPATH
+	if [ -f $BLOCKFILE ]; then
+	    ddblock_diagnostic "Found a file corresponding to "$EXT" file type"
+	    BLOCKFILE=""$BLOCKPATH"/"$BLOCKFILE""
+	else
+	    echo Error: No block files found. Expected file "$TAG"-"$EXT".txt 1>&2
+	    dxpopd
+	    exit 1
+	fi
+	dxpopd
+
+	# Get line numbers corresponding to a match @ddblock_begin
+	# [tag] and @ddblock_end [tag]. The resultant arrays
+	# DDBEGIN_NUM and DDEND_NUM will have sizes greater than 1 if
+	# there are multiple instances of @ddblock_begin [tag] and
+	# @ddblock_end [tag] pairs.
+	DDBEGIN_TAG="@ddblock_begin "$TAG
+	DDEND_TAG="@ddblock_end "$TAG
+	DDBEGIN_NUM=( `grep -nw "${DDBEGIN_TAG}" $FILE | cut -d ':' -f 1` )
+	DDEND_NUM=( `grep -nw "${DDEND_TAG}" $FILE | cut -d ':' -f 1` )
+	
+	ddblock_diagnostic "Found @ddblock_begin "$TAG" here: "${DDBEGIN_NUM[*]}""
+	ddblock_diagnostic "Found @ddblock_begin "$TAG" here: "${DDEND_NUM[*]}""
+	
+	# Check that the number of @ddblock_begin instances matches
+	# that of @ddblock_end instances for the specified tag. Exit
+	# if either @ddblock_begin or @ddblock_end keywords are
+	# missing.
+
+	if [ ${#DDBEGIN_NUM[@]} -lt ${#DDEND_NUM[@]} ]; then
+	    echo "Error: Missing @ddblock_begin "$TAG""  1>&2
+	    exit 1
+	fi
+
+	if [ ${#DDBEGIN_NUM[@]} -gt ${#DDEND_NUM[@]} ]; then
+	    echo "Error: Missing @ddblock_end "$TAG""  1>&2
+	    exit 1
+	fi
+
+	# Check if there is at least one @ddblock_begin and
+	# @ddblock_end pair.
+	if [ ${#DDBEGIN_NUM[@]} -eq 0 ]; then
+	    echo Warning: No match found for $TAG
+	else
+	    # Backup the existing FILE in the TMPPATH
+	    # directory. Create a directory structure in the absolute
+	    # path of the FILE inside the TMPPATH directory.
+	    FILENAME=`basename $FILE`
+	    FILEPATH_ABS=`pwd`
+	    if ! [ "$FILE" = "$FILENAME" ]; then
+                # FILE may not be in the current directory.  Strip the
+		# path excluding "/$FILENAME" from $FILE.
+		FILEPATH=${FILE:0:${#FILE} - ${#FILENAME} - 1}
+		# Change to FILEPATH and get the absolute path.
+		dxpushd $FILEPATH
+		FILEPATH_ABS=`pwd`
+		dxpopd
+	    fi
+
+	    # Create the required directory structure in the $TMPPATH
+	    # directory.
+	    BAK_DIR=$TMPPATH$FILEPATH_ABS
+	    mkdir -p $BAK_DIR
+	    
+	    # Create a back up copy of FILE, and delete its contents.
+	    # Also create files to store extracted text.
+	    BAK_FILE=$BAK_DIR"/"$FILENAME"."$TAG".bak"
+	    BAK_FILE_BEFORE=$BAK_DIR"/"$FILENAME"."$TAG".before.bak"
+	    BAK_FILE_AFTER=$BAK_DIR"/"$FILENAME"."$TAG".after.bak"
+	    ddblock_diagnostic "Copying $FILE to $BAK_FILE"
+	    cp $FILE $BAK_FILE
+
+	    # Loop through multiple instances of @ddblock pairs and
+	    # sequentially update the text between each valid pair of
+	    # @ddblock_begin and @ddblock_end instances.
+	    for (( i = 0; i < ${#DDBEGIN_NUM[@]}; i++ )); do
+		BEGIN=${DDBEGIN_NUM[$i]}
+		END=${DDEND_NUM[$i]}
+		
+	        # Check that the line containing an instance of
+	        # @ddblock_begin is before the one containing the
+	        # instance of @ddblock_end.
+		if [ $BEGIN -ge $END ]; then
+		    echo "Error: @ddblock_begin "$TAG" appears before @ddblock_end "$TAG"" 1>&2
+		    exit 1
+		fi
+
+	        # Extract the text between @ddblock_begin and
+	        # @ddblock_end pair (exluding tags). Also, print text
+	        # before and after the extracted block.
+		head -n $BEGIN $BAK_FILE > $BAK_FILE_BEFORE
+		if ! [ $i -eq 0 ]; then
+		    # There are multiple instances of ddblock with the
+		    # same tag. And this is not the first
+		    # instance. Consider text only from the last
+		    # @ddblock_end line.
+		    END_LAST=${DDEND_NUM[$i - 1]}
+		    head -n $BEGIN $BAK_FILE | tail -n +$END_LAST > $BAK_FILE_BEFORE
+		fi
+
+		EXTRACTED_TEXT=`head -n $(( $END - 1 )) $BAK_FILE | tail -n +$(( $BEGIN + 1 ))`
+
+		if [ $i -eq $(( ${#DDBEGIN_NUM[@]} - 1 )) ]; then
+		    # There are multiple instances of ddblock with the
+		    # same tag. And this the last instance. Consider
+		    # all the text from the @ddblock_end line till the
+		    # end of file.
+		    tail -n +$END $BAK_FILE > $BAK_FILE_AFTER
+		fi
+		
+		ddblock_diagnostic ""
+		ddblock_diagnostic "--- Text prior to the block ---"
+		BEFORE_TEXT=`cat $BAK_FILE_BEFORE`
+		ddblock_diagnostic "$BEFORE_TEXT"
+		ddblock_diagnostic "--- The block ---"
+		ddblock_diagnostic "$EXTRACTED_TEXT"
+		ddblock_diagnostic "--- Text after the block ---"
+		AFTER_TEXT=`cat $BAK_FILE_AFTER`
+		ddblock_diagnostic "$AFTER_TEXT"
+		ddblock_diagnostic "Found a ddblock "$TAG 
+
+                # Overwrite the original file with updated block.
+		if [ $i -eq 0 ]; then
+		    # This is the first instance of a ddblock for the
+		    # given tag. Overwrite the target file.
+		    cat $BAK_FILE_BEFORE > $FILE
+		else
+		    # append the target file.
+		    cat $BAK_FILE_BEFORE >> $FILE
+		fi
+
+		# Append the replacement block.
+		cat $BLOCKFILE >> $FILE
+
+		# Append the target file with the remainder of the
+		# text in the file.
+		if [ $i -eq $(( ${#DDBEGIN_NUM[@]} - 1 )) ]; then
+		    # This is the last instance of a ddblock for the
+		    # given tag. Append all the text from the
+		    # @ddblock_end line till the end of file.
+		    cat $BAK_FILE_AFTER >> $FILE
+		fi
+	    done
+
+	    echo $FILE - ddblock \"$TAG\" was updated!
+	fi
+    elif [[ $FILE == "."* ]]; then
+	echo "Warning: Ignoring target "$FILE""
+	echo The target name or path should not contain "/."
+    elif [[ $FILE == "."* ]]; then
+	echo "Warning: Ignoring target "$FILE""
+	echo The target name or path should not have a "." at the beginning.
+    elif [[ $FILE == *"~" ]]; then
+	echo "Warning: Ignoring target "$FILE""
+	echo The target name or path should not have a "~" at the end.
+    else
+	echo "Warning: Ignoring target "$FILE""
+	echo The target should not be a ".bak" file.
+    fi
+}
+
+################################################################################
+# Function ddblockupd
+################################################################################
+# @ddblock_begin doc_ddblockupd
+#
+# \ddcommand{ddblockupd}
+#
+# \ddcode{ddblockupd}: Process all files in the current directory
+# with \ddcode{ddblockup}
+#
+# \ddusage{ddblockupd <tag> <blockpath> <backuppath>}
+#
+# See \ddcode{ddblockup} for more information.
+#
+# @ddblock_end doc_ddblockupd
+################################################################################
+function ddblockupd {
+    # This function may be called using dxtrex, and the number of
+    # arguments will be just 1 in that case.
+    if [ $# -eq 0 ]; then
+	echo ddblockupd error: arg count. 1>&2
+	exit 1
+    fi
+
+    set -a
+    DXDIEX_ARGS="$@"
+    dxdiex ddblockup all false
+}
+
+################################################################################
+# Function ddblockexd
+################################################################################
+# @ddblock_begin doc_ddblockexd
+#
+# \ddcommand{ddblockexd}
+#
+# \ddcode{ddblockexd}: Process all files in the current directory
+# with \ddcode{ddblockex}
+#
+# \ddusage{ddblockexd <tag> [<extractprefix>]}
+#
+# See \ddcode{ddblockex} for more information.
+#
+# @ddblock_end doc_ddblockexd
+################################################################################
+function ddblockexd {
+    # This function may be called using dxtrex, and the number of
+    # arguments will be just 1 in that case.
+    if [ $# -eq 0 ]; then
+	echo ddblockexd error: arg count. 1>&2
+	exit 1
+    fi
+
+    set -a
+    DXDIEX_ARGS="$@"
+    dxdiex ddblockex all false
+}
+
+################################################################################
+# Function ddblockupt
+################################################################################
+# @ddblock_begin doc_ddblockupt
+#
+# \ddcommand{ddblockupt}
+#
+# \ddcode{ddblockupt}: Process all files in the directory tree
+# rooted at the current directory with \ddcode{ddblockup}
+#
+# \ddusage{ddblockupt <tag> <blockpath> <backuppath>}
+#
+# See \ddcode{ddblockup} and \ddcode{ddblockupd} for more
+# information.
+#
+# @ddblock_end doc_ddblockupt
+################################################################################
+function ddblockupt {
+    if [ $# -ne 3 ]; then
+	echo ddblockupt error: arg count. 1>&2
+	exit 1
+    fi
+
+    local lxargs="$@"
+    dxtrex ddblockupd "$lxargs"
+}
+
+################################################################################
+# Function ddblockext
+################################################################################
+# @ddblock_begin doc_ddblockext
+#
+# \ddcommand{ddblockext}
+#
+# \ddcode{ddblockext}: Process all files in the directory tree
+# rooted at the current directory with \ddcode{ddblockex}
+#
+# \ddusage{ddblockext <tag> [<extractprefix>]}
+#
+# See \ddcode{ddblockex} and \ddcode{ddblockexd} for more
+# information.
+#
+# @ddblock_end doc_ddblockext
+################################################################################
+function ddblockext {
+    if [[ $# -lt 1 || $# -gt 2 ]]; then
+	echo ddblockext error: arg count. 1>&2
+	exit 1
+    fi
+
+    local lxargs="$@"
+    dxtrex ddblockexd "$lxargs"
+}
+
+
+    
+

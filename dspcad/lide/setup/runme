@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+
+################################################################################
+# @ddblock_begin copyright
+#
+# Copyright (c) 1997-2018
+# Maryland DSPCAD Research Group, The University of Maryland at College Park 
+#
+# Permission is hereby granted, without written agreement and without
+# license or royalty fees, to use, copy, modify, and distribute this
+# software and its documentation for any purpose, provided that the above
+# copyright notice and the following two paragraphs appear in all copies
+# of this software.
+# 
+# IN NO EVENT SHALL THE UNIVERSITY OF MARYLAND BE LIABLE TO ANY PARTY
+# FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES
+# ARISING OUT OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF
+# THE UNIVERSITY OF MARYLAND HAS BEEN ADVISED OF THE POSSIBILITY OF
+# SUCH DAMAGE.
+# 
+# THE UNIVERSITY OF MARYLAND SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+# INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE. THE SOFTWARE
+# PROVIDED HEREUNDER IS ON AN "AS IS" BASIS, AND THE UNIVERSITY OF
+# MARYLAND HAS NO OBLIGATION TO PROVIDE MAINTENANCE, SUPPORT, UPDATES,
+# ENHANCEMENTS, OR MODIFICATIONS.
+#
+# @ddblock_end copyright
+################################################################################
+
+################################################################################
+# This script is intended to be run as: 
+# source "$UXLIDE"/setup/runme
+# from the parent directory of lide_user once UXLIDE is properly set. The 
+# lide_user directory will be created if it is not already there.
+#
+# Usage format 1: source "$UXLIDE"/setup/runme 
+# Usage format 2: source "$UXLIDE"/setup/runme nobuild
+#
+# The nobuild argument is optional. If it is not present, then 
+# the package will be built upon setup.
+#
+# The variable UXLIDE should be set before calling this script
+################################################################################
+
+# Export definitions to sub-processes
+set -a
+
+lxprog="lide-setup-runme"
+lxbuild=""
+
+# Check argument count and usage.
+if [[ ($# -gt 1)]]; then
+    echo "$lxprog" error: arg count
+    exit 1
+elif [[ $# -eq 0 ]]; then
+    lxbuild="true"
+elif [[ ($# -eq 1) &&  ("$1" = "nobuild") ]]; then
+    lxbuild="false"
+else 
+    echo "$lxprog" error: invalid argument
+    exit 1
+fi
+
+# Check if UXLIDE path is set
+if [ -z "$UXLIDE" ]; then
+    echo "$lxprog" error: UXLIDE is not set
+    exit 1
+fi
+
+mkdir -p lide_user/startup
+
+if [ $? -ne 0 ]; then
+    echo "$lxprog" error: Could not make directory --- \"lide_user/startup\"
+    exit 1
+fi
+
+pushd .
+cd lide_user/startup
+
+lxfile="uxdefs_lide"
+lxheader="$UXLIDE"/setup/uxdefs-header.txt
+if [ -f "$lxfile" ]; then
+    mv "$lxfile" "$lxfile".bak
+fi
+touch "$lxfile"
+cat "$lxheader" >> "$lxfile"
+
+# Insert code to set the LIDE installation directory.
+# Set the UXLIDE variable only if it has not been previously set. This
+# allows the setting to be controlled, if desired, from earlier startup or
+# configuration processes.
+echo if \[ -z \"\$UXLIDE\" \]\; then >> "$lxfile"
+echo "    "UXLIDE="$UXLIDE" >> "$lxfile"
+echo fi >> "$lxfile"
+
+lxfile="lide_startup"
+if [ -f "$lxfile" ]; then
+    mv "$lxfile" "$lxfile".bak
+fi
+cp "$UXLIDE"/setup/"$lxfile" .
+
+# Modified to exit after setup without building
+if [ "$lxbuild" = "false" ]; then
+    echo "$lxprog": setup complete.
+    echo To start up LIDE, run \"source startup/lide_startup\"
+    echo from this directory.
+    exit 0
+fi
+
+# Start up LIDE
+cd ..
+source startup/lide_startup
+if [ $? -ne 0 ]; then
+    echo "$lxprog" error: problem encountered when starting up LIDE
+    popd
+    exit 1
+fi
+
+# Build LIDE
+lidebuild
+if [ $? -ne 0 ]; then
+    echo "$lxprog" error: problem encountered when bulding LIDE
+    popd
+    exit 1
+fi
+
+popd
+
+echo "$lxprog": setup and build complete

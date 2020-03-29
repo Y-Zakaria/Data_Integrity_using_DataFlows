@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+
+# UX (user-specific) variable definitions for DICE that are needed to
+# start up DICE. See the DICE setup instructions for more information
+# on how to customize this file.
+# Edit only below the dashed line below.
+#
+# Warning: this file is overwritten when running $UXDICE/setup/runme;
+# back up any changes to the file before executing this runme utility.
+# 
+# Template version: 03/13/2014
+# -----------------------------------------------------------------------------
+

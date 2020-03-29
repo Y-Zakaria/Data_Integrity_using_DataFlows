@@ -1,0 +1,109 @@
+#!/usr/bin/env bash
+
+# @ddblock_begin copyright 
+#
+# Copyright (c) 1997-2015
+# Maryland DSPCAD Research Group, The University of Maryland at College Park 
+#
+# Permission is hereby granted, without written agreement and without
+# license or royalty fees, to use, copy, modify, and distribute this
+# software and its documentation for any purpose, provided that the above
+# copyright notice and the following two paragraphs appear in all copies
+# of this software.
+# 
+# IN NO EVENT SHALL THE UNIVERSITY OF MARYLAND BE LIABLE TO ANY PARTY
+# FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES
+# ARISING OUT OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF
+# THE UNIVERSITY OF MARYLAND HAS BEEN ADVISED OF THE POSSIBILITY OF
+# SUCH DAMAGE.
+# 
+# THE UNIVERSITY OF MARYLAND SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+# INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE. THE SOFTWARE
+# PROVIDED HEREUNDER IS ON AN "AS IS" BASIS, AND THE UNIVERSITY OF
+# MARYLAND HAS NO OBLIGATION TO PROVIDE MAINTENANCE, SUPPORT, UPDATES,
+# ENHANCEMENTS, OR MODIFICATIONS.
+#
+# @ddblock_end copyright 
+
+# dxtrex
+#
+# @ddblock_begin doc
+# Naming: dx -> dice, tr (directory) tree, ex -> execute
+#
+# Usage: \verb#dxtrex [-b] <prog> [<arg>]#
+#
+# Example: \verb#dxtrex ./makeme#
+# Example: \verb#dxtrex $MYUTILS/cleanupdir#
+# Example: \verb#dxtrex -b $UXTMP/findit myfile1#
+# Example: \verb#dxtrex $UXTMP/findthem "myfile1 myfile2"#
+#
+# This script traverses the directory subtree rooted at the current working
+# directory, and executes the executable named <prog> in each directory
+# that it visits.
+# By default, the program <prog> is executed "top-down" (that is, it is 
+# executed
+# in higher level subdirectories before lower level ones).
+# If the -b option is used, then <prog> is executed "bottom-up" instead. 
+# Directories whose names begin with "." are ignored in traversal (in both
+# top-down and bottom-up modes).
+#
+# The program <prog> should be accessible through the PATH throughout
+# the entire directory tree that is being traversed. Thus, for example,
+# if one intends to invoke ./util as <prog>, but only in directories
+# that actually contain a script called "util", then one needs to
+# create a wrapper script that invokes ./util only if it exists.
+# This wrapper script would then be referenced as the argument to dxtsc.
+#
+# If a second argument to dxtrex is present, then the argument is passed
+# on as an argument to <prog> each time <prog> is called. Multiple
+# arguments can be passed to <prog> by enclosing them in double quotes
+# (e.g., "myfile1 myfile2").
+#
+# @ddblock_end doc
+
+bottom_up="no"
+
+while getopts ":b" opt; do
+    case $opt in
+    b ) bottom_up="yes" ;;
+    \? ) echo 'usage: dxtrex [-b]' 
+         exit 1
+    esac
+done
+shift $(($OPTIND - 1))
+
+# Extract the program arguments
+if [ -z "$1" ]; then
+    echo dxtrex error: Missing program argument
+    exit 1
+fi
+if [ -n "$3" ]; then
+    echo dxtrex error: Extra argument
+    exit 1
+fi
+
+prog_args="$2"
+prog=$1
+
+if [ $bottom_up = "no" ]; then
+    # Execute <prog> in the current directory
+    $prog "$prog_args"
+    dxtrex_option=""
+else
+    dxtrex_option="-b"
+fi
+
+# Recurse to subdirectories
+for file in `ls -d * 2>$UXTMP/dxtrex_discard.txt` ; do
+    if [ -d $file ]; then
+        cd $file 
+        dxtrex $dxtrex_option $prog "$prog_args"
+        cd ..
+    fi
+done 
+
+if [ $bottom_up = "yes" ]; then
+    # Execute <prog> in the current directory
+    $prog "$prog_args"
+fi

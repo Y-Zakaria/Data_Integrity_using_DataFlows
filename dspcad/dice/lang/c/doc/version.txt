@@ -1,0 +1,6 @@
+DICELANG-C (dlc) --- C-Language Plug-In for the 
+DSPCAD Integrative Command Line Environment (DICE)
+
+This version of dlc is available as part of the following
+version of DICE:
+

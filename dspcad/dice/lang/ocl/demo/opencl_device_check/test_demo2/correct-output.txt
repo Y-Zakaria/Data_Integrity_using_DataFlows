@@ -1,0 +1,2 @@
+Which device do you want to use for OpenCL? 1:GPU, 2:CPU
+CPU for OpenCL is successfully loaded

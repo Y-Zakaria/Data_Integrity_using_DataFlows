@@ -1,0 +1,8 @@
+DICELANG --- Language-Specific Plug-Ins for the 
+DSPCAD Integrative Command Line Environment (DICE)
+
+DICELANG Version 0.2, revision: 03/12/2014
+
+Maryland DSPCAD Research Group
+University of Maryland at College Park
+http://www.ece.umd.edu/DSPCAD/home/dspcad.htm

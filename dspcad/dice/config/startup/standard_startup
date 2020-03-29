@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+
+############################################################################
+# @ddblock_begin copyright
+#
+# Copyright (c) 1997-2015
+# Maryland DSPCAD Research Group, The University of Maryland at College Park 
+#
+# Permission is hereby granted, without written agreement and without
+# license or royalty fees, to use, copy, modify, and distribute this
+# software and its documentation for any purpose, provided that the above
+# copyright notice and the following two paragraphs appear in all copies
+# of this software.
+# 
+# IN NO EVENT SHALL THE UNIVERSITY OF MARYLAND BE LIABLE TO ANY PARTY
+# FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES
+# ARISING OUT OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF
+# THE UNIVERSITY OF MARYLAND HAS BEEN ADVISED OF THE POSSIBILITY OF
+# SUCH DAMAGE.
+# 
+# THE UNIVERSITY OF MARYLAND SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+# INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE. THE SOFTWARE
+# PROVIDED HEREUNDER IS ON AN "AS IS" BASIS, AND THE UNIVERSITY OF
+# MARYLAND HAS NO OBLIGATION TO PROVIDE MAINTENANCE, SUPPORT, UPDATES,
+# ENHANCEMENTS, OR MODIFICATIONS.
+#
+# @ddblock_end copyright
+############################################################################
+
+# A standard configuration for setting up DICE. In this setup, 
+# a directory called dice_user 
+# is assumed to exist; the value of DXUSER should be set to the path
+# of this dice_user directory before entering this script.
+#
+# This script needs to be sourced. 
+
+# Make sure all settings are exported into subprocesses.
+set -a
+
+# Make sure the dice user variable is set
+if [ -z "$DXUSER" ]; then
+    echo "DICE startup error: DXUSER variable is undefined."
+    return 1
+fi
+
+# Make sure the dice installation variable is set
+if [ -z "$UXDICE" ]; then
+    echo "DICE startup error: UXDICE variable is undefined."
+    return 1
+fi
+
+# Make sure there is a valid architecture setting
+if [ -z "$UXARCH" ]; then
+    echo DICE startup error: missing UXARCH platform specification
+    return 1
+elif [[ ($UXARCH != win) && ($UXARCH != sol) && ($UXARCH != lin) 
+        && ($UXARCH != macos) ]]; then
+    echo DICE startup error: invalid UXARCH platform specification 
+    echo Choices are: lin, macos, sol, win
+    return 1
+fi
+
+# The location of DICEMIN
+UXDICEMIN="$UXDICE"/min
+
+# Load the standard DICEMIN configuration.
+nextscript="$UXDICEMIN"/config/startup/standard_startup
+dx_diagnostic starting "$nextscript"
+source "$nextscript"
+dx_diagnostic finished with "$nextscript"
+
+# Stop here if we are just installing DICEMIN.
+if ! [ -d "$UXDICE"/core ]; then
+    echo DICE startup status: setup complete
+    return 1
+fi
+
+# Load the standard core configuration of DICE.
+nextscript="$UXDICE"/core/config/startup/standard_startup
+dx_diagnostic starting "$nextscript"
+source "$nextscript"
+dx_diagnostic finished with "$nextscript"
+
+# Link in user-defined customizations unless the "raw"
+# option is selected.
+if [ "$1" != raw ]; then
+    if [ -f "$DXUSER"/startup/customizations ]; then
+        nextscript="$DXUSER"/startup/customizations
+        dx_diagnostic starting "$nextscript"
+        source "$nextscript"
+        dx_diagnostic finished with "$nextscript"
+    fi
+fi
+
+# Stop here if we are not installing any more subpackages
+if ! [ -d "$UXDICE"/lang ]; then
+    echo DICE startup status: setup complete
+    return 1
+fi
+
+# Load the standard core configuration of diclelang
+UXDICELANG="$UXDICE"/lang
+DLXUSER="$DXUSER"/lang
+nextscript="$UXDICELANG"/config/startup/standard_startup
+dx_diagnostic starting "$nextscript"
+source "$nextscript"
+dx_diagnostic finished with "$nextscript"
+
+# Complete setup of dice
+echo DICE startup status: setup complete

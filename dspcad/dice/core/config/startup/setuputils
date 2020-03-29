@@ -1,0 +1,137 @@
+#!/usr/bin/env bash
+
+# -------------------------------------------------------------------------
+# @ddblock_begin copyright
+#
+# Copyright (c) 1997-2015
+# Maryland DSPCAD Research Group, The University of Maryland at College Park 
+#
+# Permission is hereby granted, without written agreement and without
+# license or royalty fees, to use, copy, modify, and distribute this
+# software and its documentation for any purpose, provided that the above
+# copyright notice and the following two paragraphs appear in all copies
+# of this software.
+# 
+# IN NO EVENT SHALL THE UNIVERSITY OF MARYLAND BE LIABLE TO ANY PARTY
+# FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES
+# ARISING OUT OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF
+# THE UNIVERSITY OF MARYLAND HAS BEEN ADVISED OF THE POSSIBILITY OF
+# SUCH DAMAGE.
+# 
+# THE UNIVERSITY OF MARYLAND SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+# INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE. THE SOFTWARE
+# PROVIDED HEREUNDER IS ON AN "AS IS" BASIS, AND THE UNIVERSITY OF
+# MARYLAND HAS NO OBLIGATION TO PROVIDE MAINTENANCE, SUPPORT, UPDATES,
+# ENHANCEMENTS, OR MODIFICATIONS.
+#
+# @ddblock_end copyright
+# -------------------------------------------------------------------------
+
+# These are very basic DICE utilities, which are useful both for normal
+# operation of DICE, as well as first-time setup of or diagnostics for DICE.
+#
+# This script is intended to be sourced.
+
+setuparch=$1
+
+if [ -z "$setuparch" ]; then
+    echo Error: missing platform for DICE setup.
+    return 1
+fi
+
+if [[ ($setuparch != win) && ($setuparch != sol) && ($setuparch != lin) &&
+    ($setuparch != macos) ]]; then
+    echo Error: invalid platform for DICE setup.
+    return 1
+fi
+
+# Function to check whether a file is a binary file.
+if [ $setuparch = win ]; then
+    function dxbinary {
+        file -b "$1" | egrep -iq "ascii|text"
+    }
+elif [ $setuparch = sol ]; then 
+    function dxbinary {
+        file "$1" | egrep -iq "text|script"
+    }
+elif [ $setuparch = lin ]; then 
+    function dxbinary {
+        file "$1" | egrep -iq "text|script"
+    }
+elif [ $setuparch = macos ]; then 
+    function dxbinary {
+        file "$1" | egrep -iq "text|script"
+    }
+fi
+
+# Scripts for DOS-to-UNIX format conversion can end up operating on themselves
+# if we leave them along with the other scripts. Therefore, we define
+# these here as functions.
+
+#
+# dxdtuf
+#
+# Stands for "(d)os (t)o (u)nix conversion on a (f)ile"
+#
+# Usage: dxdtuf <filename>
+#
+# This function performs a form of dos-to-unix file format conversion on a 
+# single file. More specifically, the utility removes any carriage return
+# characters, if present, in the specified file.
+#
+
+# The location of the compiled executable if it is present.
+lxexe="$DXMGEN"/dxrmcrcore.exe
+
+# Use the compiled executable, which is more portable, if it exists.
+if [ -f "$lxexe" ]; then
+    function dxdtuf {
+	    dxrmcr $@
+    }
+elif [ $setuparch = win ]; then
+    function dxdtuf {
+        dx_diagnostic executing dxtuf $@
+        if [ $# -ne 1 ]; then
+            echo dxdtuf error: arg count
+            return 1
+        fi
+        dos2unix "$1"
+    }
+elif [ $setuparch = sol ]; then 
+    function dxdtuf {
+        dx_diagnostic executing dxtuf $@
+        local xp
+
+        if [ $# -ne 1 ]; then
+            echo dxdtuf error: arg count
+            return 1
+        fi
+        xp=false
+        if [ -x "$1" ]; then
+            xp=true    
+        fi 
+        dos2unix -437 "$1" "$1"
+        if [ $xp = true ]; then
+            chmod +x "$1"
+        fi 
+    }
+elif [ $setuparch = lin ]; then
+    function dxdtuf {
+        dx_diagnostic executing dxtuf $@
+        if [ $# -ne 1 ]; then
+            echo dxdtuf error: arg count
+            return 1
+        fi
+        dos2unix "$1"
+    }
+elif [ $setuparch = macos ]; then
+    function dxdtuf {
+        dx_diagnostic executing dxtuf $@
+        if [ $# -ne 1 ]; then
+            echo dxdtuf error: arg count
+            return 1
+        fi
+        dos2unix "$1"
+    }
+fi

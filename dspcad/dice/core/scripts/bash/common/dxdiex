@@ -1,0 +1,109 @@
+#!/usr/bin/env bash
+
+# @ddblock_begin copyright 
+#
+# Copyright (c) 1997-2015
+# Maryland DSPCAD Research Group, The University of Maryland at College Park 
+#
+# Permission is hereby granted, without written agreement and without
+# license or royalty fees, to use, copy, modify, and distribute this
+# software and its documentation for any purpose, provided that the above
+# copyright notice and the following two paragraphs appear in all copies
+# of this software.
+# 
+# IN NO EVENT SHALL THE UNIVERSITY OF MARYLAND BE LIABLE TO ANY PARTY
+# FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES
+# ARISING OUT OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF
+# THE UNIVERSITY OF MARYLAND HAS BEEN ADVISED OF THE POSSIBILITY OF
+# SUCH DAMAGE.
+# 
+# THE UNIVERSITY OF MARYLAND SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+# INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE. THE SOFTWARE
+# PROVIDED HEREUNDER IS ON AN "AS IS" BASIS, AND THE UNIVERSITY OF
+# MARYLAND HAS NO OBLIGATION TO PROVIDE MAINTENANCE, SUPPORT, UPDATES,
+# ENHANCEMENTS, OR MODIFICATIONS.
+#
+# @ddblock_end copyright 
+
+# Configurable processing of selected files in current working directory.
+
+#
+# Usage:
+# DXDIEX_ARGS="<argument_list>"
+# dxdiex <prog> <extension> <include_binary> 
+#
+# The name is derived from: DICE (dx) utility for processing a (di)rectory
+# with a given (ex)ecutable.
+#
+# This script examines all files in the current working directory and
+# uses the executable <prog> to process all files
+# whose names have extensions that match the given extension argument
+# (optional argument).
+# If the extension argument is null (""), then all files with
+# extension-less names are processed. By "processed", we mean
+# that <prog> is executed with the given file as the first
+# argument, and with the value of the environment variable
+# DXDIEX_ARGS appended to the argument list to provide zero
+# or more additional arguments.
+# The <include_binary> argument should be set to "false" to
+# ignore binary files in the processing (even if they match the
+# given extension specification), or "true" to process any
+# matching binary files. 
+#
+# When used in conjunction with \ddprog{dxtrex},
+# this utility can be used to process selected files in entire directory trees
+# with a given program <prog> and additional argument list $DXDIEX_ARGS.
+#
+# This is script is intended primarily for incorporation into other
+# scripts. It is not the most convenient to work with on the command
+# line because of its relatively long argument list structure.
+#
+# Example usage 1:
+# DXDIEX_ARGS=""       
+# dxdiex all false cleanup
+#
+# Example usage 2:
+# DXDIEX_ARGS="optimization_level_3 portability_level_2"       
+# dxdiex o true optimize
+#
+
+if [[ ($# -ne 3) ]]; then
+    echo dxdiex error: arg count
+    exit 1
+fi
+
+dxdiex_prog="$1"
+dxdiex_extension="$2"
+dxdiex_binary="$3"
+
+if [[ ("$dxdiex_binary" != "true") && ("$dxdiex_binary" != "false") ]]; then
+    echo dxdiex error: invalid binary inclusion specification
+    exit 1
+fi 
+
+for file in `ls -d * 2>/dev/null` ; do 
+    if [ -f $file ]; then 
+
+        # Skip the file if it is a binary file and binary files are
+        # supposed to be ignored
+        if [ "$dx_binary" = "true" ]; then
+            dxbinary $file
+            if [ $? -ne 0 ]; then
+                continue
+            fi
+        fi
+
+        # Extract the filename extension
+        extension=`dxext $file`
+
+        # Perform conversion for selected extensions.
+        if [[ ("$dxdiex_extension" == all) || 
+                ("$extension" == "$dxdiex_extension") ]]; then
+            dx_diagnostic dxdiex is now processing `pwd`/$file 
+            $dxdiex_prog $file $DXDIEX_ARGS
+        fi
+    fi 
+done
+
+

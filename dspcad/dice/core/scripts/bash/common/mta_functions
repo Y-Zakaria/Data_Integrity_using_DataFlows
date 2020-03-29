@@ -1,0 +1,506 @@
+#!/usr/bin/env bash
+
+###############################################################################
+# @ddblock_begin copyright 
+#
+# Copyright (c) 1997-2015
+# Maryland DSPCAD Research Group, The University of Maryland at College Park 
+#
+# Permission is hereby granted, without written agreement and without
+# license or royalty fees, to use, copy, modify, and distribute this
+# software and its documentation for any purpose, provided that the above
+# copyright notice and the following two paragraphs appear in all copies
+# of this software.
+# 
+# IN NO EVENT SHALL THE UNIVERSITY OF MARYLAND BE LIABLE TO ANY PARTY
+# FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES
+# ARISING OUT OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF
+# THE UNIVERSITY OF MARYLAND HAS BEEN ADVISED OF THE POSSIBILITY OF
+# SUCH DAMAGE.
+# 
+# THE UNIVERSITY OF MARYLAND SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+# INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE. THE SOFTWARE
+# PROVIDED HEREUNDER IS ON AN "AS IS" BASIS, AND THE UNIVERSITY OF
+# MARYLAND HAS NO OBLIGATION TO PROVIDE MAINTENANCE, SUPPORT, UPDATES,
+# ENHANCEMENTS, OR MODIFICATIONS.
+#
+# @ddblock_end copyright 
+###############################################################################
+
+# 
+# Usage: varset <variable dir> <variable name> <value>
+#
+# To retrive the variable, use 
+#       <varable name>=`cat <variable dir>/varset_<variable name>.txt`
+# For example:
+#
+# \begin{verbatim}
+# varset $UXTMP UXLASTFILE /home/me/file.txt
+# UXLASTFILE=`cat $UXTMP/varset_UXLASTFILE.txt`
+# \end{verbatim}
+#
+function varset {
+    local outscript
+
+    outscript=$1/varset_$2.txt
+    echo $3 > $outscript
+}
+
+# @ddblock_begin doc
+# DICE utilities for MTA --- {\em m}oving {\em t}hings {\em a}round.
+# Some of these utilities modify or access the DICE last file 
+# of directory transferred
+# (LFDT) variable, which keeps track of the last file or directory that has been
+# transferred (moved or copied) into the dice user clipboard with 
+# \ddcode{dxcu} or \ddcode{dxco}.
+# @ddblock_end doc
+
+# An internal function, hence no dicedoc.
+# Retrieve the file referenced by the LFDT variable.
+# Usage: retrieve_uxlastfile <mode>
+# The mode can be either "copy" or "move"
+# \ddsee{mta subpack}. 
+function retrieve_uxlastfile {
+    if ! [ -f $UXTMP/varset_UXLASTFILE.txt ]; then 
+        echo Error --- $UXTMP/varset_UXLASTFILE.txt not found
+        return 1
+    fi
+    UXLASTFILE=`cat $UXTMP/varset_UXLASTFILE.txt`
+    if [ -z "$UXLASTFILE" ]; then
+        echo UXLASTFILE setting is empty
+        return 1
+    fi
+    infile="$UXCLIPBOARD"/"$UXLASTFILE"
+    if ! [ -a "$infile" ]; then 
+        echo Error --- $infile not found
+        return 1
+    fi
+    if [ $1 = copy ]; then
+        cp -r "$infile" .
+    elif [ $1 = move ]; then
+        mv "$infile" .
+    else
+        echo Error: invalid mode
+        return 1
+    fi
+}
+
+# Usage dx_guarded_removal <f_or_d>
+#
+# where <f_or_d> is the path to a file or directory. This function
+# performs a guarded removal for <f_or_d> based on the value of 
+# the environment variable DX_MTA_AGGRESSIVE. If this variable
+# has a non-null value, then <f_or_d> is removed. Conversely, if
+# DX_MTA_AGGRESSIVE is undefined or has a null (empty string) value,
+# then the function displays an error message and exits.
+# If <f_or_d> is non-existent, then the function returns silently.
+# The MTA here stands for "moving things around".
+function dx_guarded_removal {
+    if [ -a "$1" ]; then
+        if [ -z "$DX_MTA_AGGRESSIVE" ]; then
+            echo $DXPROG error: "$1" already exists
+            exit 1
+        else
+            rm -r -f "$1"
+            dxvalidate "$DXPROG error: could not remove previous version of $1"
+        fi
+    fi
+}
+
+# @ddblock_begin doc_dxcu
+# DICE utility to {\em cu}t a file or directory by moving it to
+# the dice user clipboard.
+# Move a specified file or directory to the dice user clipboard 
+# The dice LFDT variable is modified by this utility.
+# Usage: dxcu <f_or_d>
+# Argument <f_or_d>: the specified file or directory
+#
+# Environment variables: part of the behavior of this utility is
+# configured by the \ddcode{DX_MTA_AGRESSIVE} variable. This configuration
+# is analogous to that in the~\ref{command:dxco} command. See
+# documentation for~\ref{command:dxco} for more details.
+# \ddsee{mta subpack}. 
+# @ddblock_end doc_dxcu
+function dxcu {
+    DXPROG=dxcu
+    if [ $# -ne 1 ]; then
+        echo $DXPROG error: arg count
+        return 1
+    fi
+    if ! [ -a "$1" ]; then
+        echo $DXPROG error: $1 --- file nfound
+        return 1
+    fi
+
+    dx_ensure_dir $UXCLIPBOARD
+    dx_guarded_removal $UXCLIPBOARD/"$1"
+
+    # Ensure that the modification date is updated so that the file
+    # can be retrieved (if desired) in sequence from the clipboard with mvflkr
+    touch "$1"
+
+    mv "$1" $UXCLIPBOARD
+    varset $UXTMP UXLASTFILE $1
+}
+
+# @ddblock_begin doc_dxco
+# DICE utility to {\em co}py a file or directory by making a copy of it in
+# the dice user clipboard.
+# Copy a file or directory to the dice user clipboard. 
+# The dice LFDT variable is modified by this utility.
+# Usage: dxco <f_or_d>
+# Argument <f_or_d>: the specified file or directory
+#
+# The environment variable DX_MTA_AGGRESSIVE controls what happens when
+# a file or directory named <f_or_d> already exists in the dice user
+# clipboard. If this variable is set to a non-null value, then
+# the existing version of <f_or_d> in the dice user clipboard is
+# silently overwritten. Conversely, if DX_MTA_AGRESSIVE is not defined
+# or set to a null (empty string) value, then an error message is
+# displayed and the copy request is denied.
+# \ddsee{mta subpack}. 
+# @ddblock_end doc_dxco
+
+function dxco {
+    DXPROG=dxco
+    if [ $# -ne 1 ]; then
+        echo $DXPROG error: arg count
+        return 1
+    fi
+
+    if ! [ -a "$1" ]; then
+        echo $DXPROG error: $1 --- file not found
+        return 1
+    fi
+
+    # Extract the basename for a directory in case there is a trailing '/'.
+    # A trailing '/' can make "cp -r" behave differently on different 
+    # platforms.
+    if [ -d "$1" ]; then
+        file=`basename "$1"`
+    else
+        file="$1"
+    fi
+
+    dx_ensure_dir $UXCLIPBOARD
+    dx_guarded_removal "$UXCLIPBOARD/$file"
+
+    dxcp "$file" $UXCLIPBOARD
+    varset $UXTMP UXLASTFILE "$file"
+}
+
+
+# @ddblock_begin doc_dxpa
+# DICE utility to {\em pa}ste a file or directory from the dice user
+# clipboard.
+# Copy the specified file or directory from the dice user clipboard 
+# to the current working directory. The dice LFDT variable
+# is NOT modified by this utility..
+# Usage: dxpa <f_or_d>
+# Argument <f_or_d>: the specified file or directory
+# \ddsee{mta subpack}. 
+# @ddblock_end doc_dxpa
+
+function dxpa {
+    DXPROG=dxpa
+    if [ $# -ne 1 ]; then
+        echo $DXPROG error: arg count
+        return 1
+    fi
+    infile=$UXCLIPBOARD/$1
+    if ! [ -a $infile ]; then 
+        echo $DXPROG error --- $infile not found
+        return 1
+    fi
+    cp -r $infile .
+}
+
+# @ddblock_begin doc_dxpar
+# DICE utility to {\em pa}ste (copy into the current working directory) 
+# and {\em r}emove a file or directory
+# from the dice user clipboard.
+# Move a file from the dice user clipboard without referencing or modifying
+# the LFDT variable.
+# \ddsee{mta subpack}. 
+# @ddblock_end doc_dxpar
+function dxpar {
+    DXPROG=dxpar
+    if [ $# -ne 1 ]; then
+        echo $DXPROG error: arg count
+        return 1
+    fi
+    infile=$UXCLIPBOARD/$1
+    if ! [ -a $infile ]; then
+        echo $DXPROG error --- $infile not found
+        return 1
+    fi
+
+    mv $infile .
+}
+
+# @ddblock_begin doc_dxparl
+# DICE utility to {\em pa}ste (copy) and {\em r}emove the {\em L}FDT from the 
+# dice user clipboard.
+# Move to the current working directory the file or directory referenced by the 
+# dice LFDT variable. 
+# Usage: dxparl <no arguments>
+# \ddsee{mta subpack}. 
+# @ddblock_end doc_dxparl
+function dxparl {
+    DXPROG=dxparl
+    if [ $# -ne 0 ]; then
+        echo $DXPROG error: arg count
+        return 1
+    fi
+    retrieve_uxlastfile move
+}
+
+# @ddblock_begin doc_dxpal
+# DICE utility to {\em pa}ste the {\em L}FDT from the dice user
+# clipboard.
+# \ddcommand{dxpal}
+# \ddusage{dxpal, \ddcode{(no arguments)}}
+# Copy  to the current working directory the file or directory 
+# that is currently referenced by 
+# the DICE LFDT
+# variable.
+# \ddsee{mta subpack}. 
+# @ddblock_end doc_dxpal
+function dxpal {
+    DXPROG=dxpal
+    if [ $# -ne 0 ]; then
+        echo $DXPROG error: arg count
+        return 1
+    fi
+    retrieve_uxlastfile copy
+}
+
+# @ddblock_begin doc_dxrmcl
+# DICE utility to {\em r}e{\em m}ove a specified file or directory
+# from the DICE user {\em cl}ipboard.
+# Remove a given file or directory from the dice user clipboard without 
+# referencing or modifying the "last file" variable.
+# \ddsee{mta subpack}. 
+# @ddblock_end doc_dxrmcl
+function dxrmcl {
+    DXPROG=dxrmcl
+    if [ $# -ne 1 ]; then
+        echo $DXPROG error: arg count
+        return 1
+    fi
+
+    infile="$UXCLIPBOARD"/"$1"
+
+    if ! [ -a "$infile" ]; then
+        echo $DXPROG error: $infile not found
+        return 1 
+    fi
+
+    rm -f -r "$infile"
+}
+
+# @ddblock_begin doc_mvtlk
+# Usage: mvtlk <link> <f_or_d>
+# @ddblock_end doc_mvtlk
+function mvtlk {
+    if [ $# -ne 2 ]; then
+        echo mvtlk error: arg count
+        return 1
+    fi
+    link="$UXGO/$1.txt"
+    if ! [ -f "$link" ]; then
+        echo mvtlk error: invalid link
+        return 1
+    fi
+    dest=`cat $link`
+    mv "$2" "$dest"
+    if [ $? -ne 0 ]; then
+        echo mvtlk error: move failed
+        return 1
+    fi
+}
+
+# @ddblock_begin doc_mvflk
+# Usage: mvflk <link> <f_or_d>
+# This moves the file or directory named <f_or_d> from the specified link
+# directory to the current working directory.
+# @ddblock_end doc_mvflk
+function mvflk {
+    if [ $# -ne 2 ]; then
+        echo mvflk error: arg count
+        return 1
+    fi
+    link="$UXGO/$1.txt"
+    if ! [ -f "$link" ]; then
+        echo mvflk error: invalid link
+        return 1
+    fi
+    src=`cat $link`
+    src="$src"/"$2"
+    if ! [ -a "$src" ]; then
+        echo mvflk error: file $src not found
+        return 1
+    fi
+    mv "$src" .
+    if [ $? -ne 0 ]; then
+        echo mvflk error: move failed
+        return 1
+    fi
+}
+
+
+# @ddblock_begin doc_dxcp
+# Utility for copying files and directories. This function provides
+# a commonly-used subset of the functionality provided by the UNIX
+# cp command. It also standardizes the functionality, attempting to
+# smooth out minor (but noticeable) variations that may occur for
+# \ddcode{cp} across different platforms.
+#
+# Usage: cp <arg1> <arg2>
+#
+# If <arg1> is an existing file or directory, and <arg2> is an existing 
+# directory, then <arg1> is copied into <arg2>. 
+# @ddblock_end doc_dxcp
+function dxcp {
+    if [ $# -ne 2 ]; then
+        echo dxcp error: arg count
+        return 1
+    fi
+
+    destfile="$2"
+    destfilebase=`basename "$2"`
+
+    # Extract the basename for a directory in case there is a trailing '/'.
+    # A trailing '/' can make "cp -r" behave differently on different 
+    # platforms.
+    if [ -d "$1" ]; then
+        sourcefilebase=`basename "$1"`
+        sourcefiledir=`dirname "$1"`
+        if [ -f "$destfile" ]; then
+            echo dxcp error: source is a directory and dest is a file
+            return 1
+        elif [ "$sourcefilebase" = "$destfilebase" ]; then
+            echo -n dxcp error: source and dest have same base name ...
+            echo not allowed if source is a directory
+            return 1
+        fi
+        sourcefile="$sourcefiledir"/"$sourcefilebase"
+    else
+        sourcefile="$1"
+    fi
+
+    cp -r "$sourcefile" "$destfile"
+
+    if [ $? -ne 0 ]; then
+        echo dxcp error: copy failed
+        return 1
+    fi
+}
+
+# @ddblock_begin doc_cptlk
+# Usage: cptlk <link> <f_or_d>
+# @ddblock_end doc_cptlk
+function cptlk {
+    if [ $# -ne 2 ]; then
+        echo cptlk error: arg count
+        return 1
+    fi
+    link="$UXGO/$1.txt"
+    if ! [ -f "$link" ]; then
+        echo cptlk error: invalid link
+        return 1
+    fi
+    dest=`cat $link`
+
+    dxcp "$2" "$dest"
+}
+
+# @ddblock_begin doc_lslk
+# Usage: lslk <link>
+# List the directory pointed to by the given link.
+# Have the output sorted so that most-recently changed items show up
+# first.
+# @ddblock_end doc_lslk
+function lslk {
+    if [ $# -ne 1 ]; then
+        echo lslk error: arg count
+        return 1
+    fi
+    link="$UXGO/$1.txt"
+    if ! [ -f "$link" ]; then
+        echo lslk error: invalid link
+        return 1
+    fi
+    src=`cat $link`
+    ls -t -u -l "$src" | more
+    if [ $? -ne 0 ]; then
+        echo lslk error: listing failed
+        return 1
+    fi
+}
+
+# @ddblock_begin doc_cpflk
+# Usage: cpflk <link> <f_or_d>
+# This copies the file or directory named <f_or_d> from the specified link
+# directory to the current working directory.
+# @ddblock_end doc_cpflk
+function cpflk {
+    if [ $# -ne 2 ]; then
+        echo cpflk error: arg count
+        return 1
+    fi
+    link="$UXGO/$1.txt"
+    if ! [ -f "$link" ]; then
+        echo cpflk error: invalid link
+        return 1
+    fi
+    src=`cat $link`
+    src="$src"/"$2"
+    if ! [ -a "$src" ]; then
+        echo cpflk error: file $src not found
+        return 1
+    fi
+
+    dxcp "$src" .
+    if [ $? -ne 0 ]; then
+        echo cpflk error: copy failed
+        return 1
+    fi
+}
+
+# @ddblock_begin doc_mvflkr
+# \ddcode{mvflkr}
+# (m)o(v)e (f)rom (l)ink directory --- most (r)ecently accessed file
+# or directory.
+# 
+# Usage: mvflkr <link> 
+# This moves the most recenlty accessed file or directory in the specified link
+# directory to the current working directory. For example, if one has just
+# downloaded a file into a standard download directly that is linked
+# to the alias "down", then one can transfer that file into the
+# current working directory by running the following command.
+#
+# \ddcode{mvflkr down}
+# @ddblock_end doc_mvflkr
+function mvflkr {
+    if [ $# -ne 1 ]; then
+        echo mvflkr error: arg count
+        return 1
+    fi
+    link="$UXGO/$1.txt"
+    if ! [ -f "$link" ]; then
+        echo mvflkr error: invalid link
+        return 1
+    fi
+    src=`cat $link`
+    listing=
+
+    file=`ls -t -u "$src" | head -n 1`
+    if [ -z "$file" ]; then
+        echo mvflkr error: no files available through specified link
+        return 1
+    fi
+    mvflk $1 "$file"
+}
+

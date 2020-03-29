@@ -1,0 +1,1 @@
+config for LIDE-Android package

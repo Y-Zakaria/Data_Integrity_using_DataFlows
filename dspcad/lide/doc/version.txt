@@ -1,0 +1,7 @@
+The DSPCAD Lightweight Dataflow Environment (LIDE)
+
+Version 1.0, revision: Tue May 08 16:04:02 2018 EDT
+
+Maryland DSPCAD Research Group
+University of Maryland at College Park
+http://www.ece.umd.edu/DSPCAD/home/dspcad.htm

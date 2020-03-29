@@ -1,0 +1,5 @@
+DICELANG-OpenCL (dlocl) --- OpenCL-language plug-in for the 
+DSPCAD Integrative Command Line Environment (DICE)
+
+This version of dlocl is available as part of the following
+version of DICE:

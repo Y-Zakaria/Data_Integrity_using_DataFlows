@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+
+# UX (user-specific) variable definitions for LIDE that are needed to
+# start up LIDE. See the LIDE setup instructions for more information
+# on how to customize this file.
+# Edit only below the dashed line below.
+#
+# Warning: this file is overwritten when running $UXLIDE/setup/runme;
+# back up any changes to the file before executing this runme utility.
+# 
+# Template version: 01/16/2015
+# -----------------------------------------------------------------------------
+

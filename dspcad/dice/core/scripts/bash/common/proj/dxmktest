@@ -1,0 +1,120 @@
+#!/usr/bin/env bash
+
+# @ddblock_begin copyright 
+#
+# Copyright (c) 1997-2015
+# Maryland DSPCAD Research Group, The University of Maryland at College Park 
+#
+# Permission is hereby granted, without written agreement and without
+# license or royalty fees, to use, copy, modify, and distribute this
+# software and its documentation for any purpose, provided that the above
+# copyright notice and the following two paragraphs appear in all copies
+# of this software.
+# 
+# IN NO EVENT SHALL THE UNIVERSITY OF MARYLAND BE LIABLE TO ANY PARTY
+# FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES
+# ARISING OUT OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF
+# THE UNIVERSITY OF MARYLAND HAS BEEN ADVISED OF THE POSSIBILITY OF
+# SUCH DAMAGE.
+# 
+# THE UNIVERSITY OF MARYLAND SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+# INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE. THE SOFTWARE
+# PROVIDED HEREUNDER IS ON AN "AS IS" BASIS, AND THE UNIVERSITY OF
+# MARYLAND HAS NO OBLIGATION TO PROVIDE MAINTENANCE, SUPPORT, UPDATES,
+# ENHANCEMENTS, OR MODIFICATIONS.
+#
+# @ddblock_end copyright 
+
+# Make a subdirectory for a single unit test in a project testing tree.
+# The generated README.txt file includes a placeholder for text that
+# describes the test. Placeholders are also created for the makeme and
+# runme scripts, as well as the correct-output and expected-error files.
+#
+# @author Shuvra S. Bhattacharyya
+#
+# Usage: dxmktest  <label> <author(s)>
+#
+# The name of the subdirectory created is "test<label>".
+#
+# Use quotes around the author(s) argument if spaces are desired.
+# Example usage: dxmktest 1 Martha
+# Example usage: dxmktest _error_check "Martha Jones and Fred Roberts"
+#
+
+# Check the script arguments.
+if [ -z "$1" ]; then
+    echo dxmktest: Missing label argument
+    exit 1
+fi
+
+if [ -z "$2" ]; then
+    echo dxmktest: Missing authors argument.
+    exit 1
+fi
+
+if [ -n "$3" ]; then
+    echo dxmktest: Too many script arguments.
+    exit 1
+fi
+
+# Set up the top-level direcotry for the test
+if [ -a test$1 ]; then
+    echo Error: test$1 already exists
+    exit 1
+fi
+mkdir test$1
+cd test$1
+
+# Set up the README file
+touch README.txt
+cat $UXCOPYRIGHT/copyright-txt.txt >> README.txt
+echo >> README.txt
+echo FIXME: Enter a brief description of the test here >> README.txt
+echo >> README.txt
+echo @author $2. >> README.txt
+echo >> README.txt
+dxdtuf README.txt
+
+# Set up the makeme script
+touch makeme
+echo \#\!/usr/bin/env bash >> makeme
+cat $UXCOPYRIGHT/copyright-sh.txt >> makeme
+echo >> makeme
+echo >> makeme
+echo >> makeme
+echo \# Script to build the executable for this test >> makeme
+echo \# Usage: makeme [no arguments] >> makeme
+echo >> makeme
+echo \# [FIXME: complete this script, this is just a template] >> makeme
+echo >> makeme
+dxdtuf makeme
+chmod +x makeme
+
+# Set up the runme script
+touch runme
+echo \#\!/usr/bin/env bash >> runme
+cat $UXCOPYRIGHT/copyright-sh.txt >> runme
+echo >> runme
+echo >> runme
+echo >> runme
+echo \# Script to run this test >> runme
+echo \# Usage: runme [no arguments] >> runme
+echo >> runme
+echo \# [FIXME: complete this script, this is just a template] >> runme
+echo >> runme
+dxdtuf runme
+chmod +x runme
+
+# Set up the test output files
+touch correct-output.txt
+echo [FIXME: insert correct output here, >> correct-output.txt
+echo this is just a placeholder] >> correct-output.txt
+dxdtuf correct-output.txt
+touch expected-errors.txt
+echo [FIXME: insert expected error output here, >> expected-errors.txt
+echo this is just a placeholder] >> expected-errors.txt
+dxdtuf expected-errors.txt
+
+# Wrap things up.
+cd ..

@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+
+# @ddblock_begin copyright 
+#
+# Copyright (c) 1997-2015
+# Maryland DSPCAD Research Group, The University of Maryland at College Park 
+#
+# Permission is hereby granted, without written agreement and without
+# license or royalty fees, to use, copy, modify, and distribute this
+# software and its documentation for any purpose, provided that the above
+# copyright notice and the following two paragraphs appear in all copies
+# of this software.
+# 
+# IN NO EVENT SHALL THE UNIVERSITY OF MARYLAND BE LIABLE TO ANY PARTY
+# FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES
+# ARISING OUT OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF
+# THE UNIVERSITY OF MARYLAND HAS BEEN ADVISED OF THE POSSIBILITY OF
+# SUCH DAMAGE.
+# 
+# THE UNIVERSITY OF MARYLAND SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+# INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE. THE SOFTWARE
+# PROVIDED HEREUNDER IS ON AN "AS IS" BASIS, AND THE UNIVERSITY OF
+# MARYLAND HAS NO OBLIGATION TO PROVIDE MAINTENANCE, SUPPORT, UPDATES,
+# ENHANCEMENTS, OR MODIFICATIONS.
+#
+# @ddblock_end copyright 
+
+
+# Script to run all of the tests in a test suite.
+#
+# This script uses the test_root environment variable. This variable
+# should be defined before calling this script. The variable should
+# contain the absolute DOS path of the root directory for the test
+# suite. 
+#
+# usage: run-test-suite <no arguments>
+#
+# Side effects: test output and error output files are created/updated
+# in all of the leaf-level test directores. The overall test output
+# is placed in the test-output.txt file of $test_root. Status output
+# and diagnostic output are printed to standard output.
+#
+# @author Shuvra S. Bhattacharyya
+# University of Maryland, College Park 
+#
+
+
+if [ $run_tests_verbose = yes ]; then
+    echo calling run_test_suite
+    echo test root is $test_root
+fi
+
+dxpushd $test_root
+
+# Delimeter between different sections of test output.
+test_output_delimeter=-----------------------------------------------------
+export test_output_delimeter 
+
+# Output directory in which test output files are stored. Note: this
+# directory should not start with "test" because directories starting
+# with "test" have a special interpretation in the testing setup.
+test_output_directory=autotest-output
+export test_output_directory
+
+# Output file for test results.
+if ! [ -d $test_output_directory ]; then 
+    mkdir $test_output_directory
+    cd $test_output_directory
+    echo "Automatically-generated test-output directory" > README.txt
+    cd ..
+fi
+
+test_output=$test_root/$test_output_directory/test_output.txt
+export test_output
+test_summary_output=$test_root/$test_output_directory/test_summary.txt
+export test_summary_output
+
+# Make a backup copy of any previous test output.
+if [ -f $test_output ]; then 
+    mv $test_output $test_output.bak
+fi
+
+# Test output prologue.
+echo "Tests started on:" > $test_output
+date >> $test_output
+
+# For each subdirectory covered by this test suite, run all tests in
+# that subdirectory.
+test_one_level `pwd`
+
+# rem Test output epilogue.
+echo "Tests completed on:"  >> $test_output
+date >> $test_output
+
+# Wrap-up the progress output.
+
+echo $test_output_delimeter
+echo "All tests are complete."
+
+if [ $run_tests_verbose = yes ]; then
+    # Make a quick check to see if any tests failed. This check is based
+    # on the observation that the "diff --brief" command always generates
+    # a "differ" string when it encounters any difference between files.
+    # Thus, discrepancies between test output and correct output will
+    # result in "differ" strings being sent to the test output file.
+    echo Error Output:
+    echo $test_output_delimeter
+    test_error_indicator=differ
+    grep $test_error_indicator $test_output
+    echo $test_output_delimeter
+    echo Any $test_error_indicator strings
+    echo in the Error Output above indicate the presence of one or 
+    echo more test failures. 
+fi
+
+# Remove junk characters from the test output. 
+dxdtuf $test_output 2> $UXTMP/run_test_suite_discard.txt
+
+# Summarize the results from the test output
+echo
+echo Summary of test results:
+process-results.exe $test_summary_output < $test_output 
+echo
+echo Complete output is in $test_output
+echo Expanded summary output is in $test_summary_output
+echo $test_output_delimeter
+
+dxpopd
+

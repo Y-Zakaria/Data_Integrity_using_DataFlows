@@ -1,0 +1,8 @@
+DICEMIN: A minimal version of the DSPCAD Integrative Command Line Environment
+(DICE)
+
+DICEMIN Version 1.2, revision: 02/02/2014
+
+Maryland DSPCAD Research Group
+University of Maryland at College Park
+http://www.ece.umd.edu/DSPCAD/home/dspcad.htm

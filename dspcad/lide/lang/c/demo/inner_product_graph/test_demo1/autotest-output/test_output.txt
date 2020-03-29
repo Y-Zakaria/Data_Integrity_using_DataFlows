@@ -1,0 +1,10 @@
+Tests started on:
+Tue, Mar 28, 2017 12:49:30 PM
+-----------------------------------------------------
+Test result for:
+/home/yzliu/gitlab/lidepub/lide/lang/c/demo/inner_product_graph/test_demo1
+-----------------------------------------------------
+Error comparison result for: 
+/home/yzliu/gitlab/lidepub/lide/lang/c/demo/inner_product_graph/test_demo1
+Tests completed on:
+Tue, Mar 28, 2017 12:49:31 PM

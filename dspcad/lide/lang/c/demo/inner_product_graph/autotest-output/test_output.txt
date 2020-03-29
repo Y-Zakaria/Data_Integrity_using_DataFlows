@@ -1,0 +1,22 @@
+Tests started on:
+Mon, Apr 17, 2017 11:32:10 AM
+-----------------------------------------------------
+Test result for:
+/home/yzliu/gitlab/lidepub/lide/lang/c/demo/inner_product_graph/test_demo1
+-----------------------------------------------------
+Error comparison result for: 
+/home/yzliu/gitlab/lidepub/lide/lang/c/demo/inner_product_graph/test_demo1
+-----------------------------------------------------
+Test result for:
+/home/yzliu/gitlab/lidepub/lide/lang/c/demo/inner_product_graph/test_demo2
+-----------------------------------------------------
+Error comparison result for: 
+/home/yzliu/gitlab/lidepub/lide/lang/c/demo/inner_product_graph/test_demo2
+-----------------------------------------------------
+Test result for:
+/home/yzliu/gitlab/lidepub/lide/lang/c/demo/inner_product_graph/test_demo3
+-----------------------------------------------------
+Error comparison result for: 
+/home/yzliu/gitlab/lidepub/lide/lang/c/demo/inner_product_graph/test_demo3
+Tests completed on:
+Mon, Apr 17, 2017 11:32:16 AM

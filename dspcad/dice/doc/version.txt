@@ -1,0 +1,6 @@
+DSPCAD Integrative Command Line Environment (DICE)
+DICE Version 1.3, revision: Wed Aug 26 18:12:53 2015 EDT
+
+Maryland DSPCAD Research Group
+University of Maryland at College Park
+http://www.ece.umd.edu/DSPCAD/home/dspcad.htm

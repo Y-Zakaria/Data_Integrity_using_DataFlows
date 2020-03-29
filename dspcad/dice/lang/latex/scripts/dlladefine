@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+
+# Generate a latex macro (newcommand) definition to standard output.
+# One useful application is of this script is the generation
+# of macro expantions in terms of shell environment variables.
+#
+# Usage: dlladefine <macro name> <replacement text>
+# Example usage:
+#
+# dlladefine mxdlpath $UXDICELANG > ./latexpaths 
+# dlladefine mxdicepath $UXDICE >> ./latexpaths
+
+if [ $# -ne 2 ]; then
+    echo $lxprog error: arg count
+    exit 1
+fi
+
+echo \\newcommand\{"$1"\}\{"$2"\}
+
+
+

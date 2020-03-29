@@ -1,0 +1,226 @@
+#!/usr/bin/env bash
+
+################################################################################
+# @ddblock_begin copyright 
+#
+# Copyright (c) 1997-2015
+# Maryland DSPCAD Research Group, The University of Maryland at College Park 
+#
+# Permission is hereby granted, without written agreement and without
+# license or royalty fees, to use, copy, modify, and distribute this
+# software and its documentation for any purpose, provided that the above
+# copyright notice and the following two paragraphs appear in all copies
+# of this software.
+# 
+# IN NO EVENT SHALL THE UNIVERSITY OF MARYLAND BE LIABLE TO ANY PARTY
+# FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES
+# ARISING OUT OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF
+# THE UNIVERSITY OF MARYLAND HAS BEEN ADVISED OF THE POSSIBILITY OF
+# SUCH DAMAGE.
+# 
+# THE UNIVERSITY OF MARYLAND SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+# INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE. THE SOFTWARE
+# PROVIDED HEREUNDER IS ON AN "AS IS" BASIS, AND THE UNIVERSITY OF
+# MARYLAND HAS NO OBLIGATION TO PROVIDE MAINTENANCE, SUPPORT, UPDATES,
+# ENHANCEMENTS, OR MODIFICATIONS.
+#
+# @ddblock_end copyright 
+################################################################################
+
+# Wrapper for python implementation of ddblock.
+
+# @ddblock_begin doc_ddblock
+#
+# \ddcommand{ddblock}
+#
+# \ddcode{ddblock}: Process dicedoc blocks with the given label (tag). 
+#
+# \ddusage{ddblock <mode> <tag> [<tag1>, <tag2>, ...] <target>}
+#
+# The usage of \ddcode{ddblock} is briefly listed by running it with
+# no arguments. \ddcode{ddblock} extracts or replaces ddblock with
+# the specified tags. In the case of \ddcode{replace},
+# \ddcode{ddblock} modifies target files. \ddcode{extract} and
+# \ddcode{replace} require an exact match of the block tags, while
+# extract_prefix requires only a prefix match. \ddcode{ddblock}
+# operates on either a single file or a recursively on a single
+# directory.
+# 
+# \ddcode{<mode>} can be one of the following:
+# 
+# \ddcode{extract}: extracts ddblocks having the label \ddcode{tag} in
+# the \ddcode{target} and prints to stdout.
+# 
+# \ddocde{extract_prefix} - extracts ddblocks having the label
+# beginning with \ddcode{tag} in the \ddcode{target} and prints to
+# stdout.
+#
+# \ddcode{replace} - replace ddblocks in \ddcode{target} having the
+# label " \ddcode{tag} from the entries found in \ddcode{UXBLOCKPATH};
+# backup copies are saved to \ddcode{UXTMP} or \ddcode{\tmp}, if
+# \ddcode{UXTMP} is not specified.
+#
+# If there are more than one tags specified, tags are processed in the
+# "specified order.
+# 
+# If \ddcode{target} is a directory, then all file in the directory
+# tree rooted \ddcode{target} are processed for the given mode and
+# tags.
+#
+# NOTE: If used in the first mode with \ddcode{replace}, the script
+# will recursively MODIFY files in the target directory changing all
+# blocks to those entries found in the block directory.
+#
+# NOTE: When there are nested ddblocks with the same tag, and the mode
+# is \ddcode{replace}, the result is equivalent to adding as many
+# replacement blocks as \ddcode{ddblock} instances for the given tag
+# between the outermost \ddcode{@ddblock_begin} and
+# \ddcode{@ddblock_end} lines.
+#
+# NOTE: When there are nested ddblocks with the same tag, and the mode
+# is \ddcode{extract}, or \ddcode{extract_prefix}, this script
+# extracts text between the first instance of \ddcode{@ddblock_begin}
+# and \ddcode{@ddblock_end} lines, followed by the next, and so on.
+#
+# NOTE: When there are nested ddblocks with different tags, and the
+# mode is \ddcode{replace}, the result is equivalent to replacing the
+# outermost \ddcode{ddblock} instance.
+#
+# NOTE: While replacing blocks, we assume that a single block for a
+# particular \ddcode{tag} will exist in file labeled
+# \ddcode{<tag>-<ext>.txt}, where \ddcode{tag} is the identifier for
+# the block which is passed in as an argument for this script, and
+# \ddcode{ext} is the extension to which this block may be applied
+# to. This allows block writers to include the appropriate comment
+# formatting for that file type. Additionally, a text file with no
+# extension is assumed to be a shell script, so when replacing blocks
+# of an extensionless file, the script will pull from the
+# \ddcode{<tag>-sh.txt}.  If an extension is found that does not
+# appear in this directory, the blocks of that file are not
+# updated. Tags are considered unique, so file name conflicts should
+# be minimal, but designers may collect different block text for the
+# same tags by locating them in different directories (e.g. liberal
+# copyright vs. a strict copyright).
+#
+# This script replaces the python script ddblock.py. Also, see
+# ddblock_subpack for functions used in this script.
+#
+# @ddblock_end doc_ddblock
+################################################################################
+
+TMPPATH="/tmp"
+EXTRACT_PREFIX=""
+BLOCKPATH=""
+MODE=""
+TARGET=""
+declare -a TAGS
+
+################################################################################
+# Parsing and Error checking
+################################################################################
+
+# Check if UXTMP environment variable is set.
+if [ -z $UXTMP ]; then
+    echo "Warning: environment variable UXTMP not set;"
+    echo "         defaulting to "$TMPPATH""
+else
+    TMPPATH=$UXTMP
+fi
+
+# Display the usage of this script for insufficient number of
+# arguments.
+if [ $# -lt 3 ]; then
+    ddblock_usage $TMPPATH
+fi
+
+# Parse the arguments if the number of arguments is at least 3.
+# Mode of operation for this script.
+MODE=$1
+
+# Tags to be processed.
+ARGS=( "$@" )
+TAGS=( ${ARGS[@]:1:$# - 2} )
+
+# Target file/directory.
+TARGET=${ARGS[$# - 1]}
+
+# Print the mode, tags, and target file/directory.
+ddblock_diagnostic "MODE:" $MODE
+ddblock_diagnostic "TAGS:" ${TAGS[*]}
+ddblock_diagnostic "TARGET:" $TARGET
+
+if [ "$MODE" = "e" -o "$MODE" = "extract" ]; then
+    MODE="extract"
+elif [ "$MODE" = "ep" -o "$MODE" = "extract_prefix" ]; then
+    MODE="extract"
+    EXTRACT_PREFIX="true"
+elif [ "$MODE" = "r" -o "$MODE" = "replace" ]; then
+    MODE="replace"
+
+    # Check if the path to directory containing replacement blocks is
+    # set through the environment variable UXBLOCKPATH.
+    lxblockpath="$UXBLOCKPATH"
+    if [ -z $lxblockpath ]; then
+	# Check if block path is set using dxvar_set utility.
+	lxblockpath=`dxvar_get UXBLOCKPATH`
+	if [ $? -ne 0 ]; then
+	    echo "Error: environment variable UXBLOCKPATH not set" 1>&2
+            exit 1
+	fi
+    fi
+
+    # Get absolute path for the block path
+    dxpushd $lxblockpath
+    BLOCKPATH=`pwd`
+    dxpopd
+else
+    echo "ERROR: The specified mode must be \"e[xtract]\", \"e[xtract_]p[refix]\", or \"r[eplace]\"" 1>&2
+    echo "Run ddblock with no arguments for more help" 1>&2
+    exit 1
+fi
+
+
+# Check if $TARGET file or directory is a valid file or directory.
+if ! [ -e $TARGET ]; then
+    echo "ERROR: The specified target $TARGET cannot be found." 1>&2
+    echo "Run ddblock with no arguments for more help" 1>&2
+    exit 1
+fi
+
+################################################################################
+# Process target file or directory.
+################################################################################
+for TAG in ${TAGS[*]}; do
+    ddblock_diagnostic "Processing tag "$TAG" from the specifed "${#TAGS[@]}" tags: "${TAGS[*]}""
+
+    if [ -f $TARGET ]; then
+        # TARGET is a regular file
+    	ddblock_diagnostic "Checking file: "$TARGET
+    	if [ "$MODE" = "replace" ]; then	    
+    	    ddblock_diagnostic "Updating block using ddblock tag $TAG in $TARGET"
+    	    ddblockup $TARGET $TAG $BLOCKPATH $TMPPATH
+    	else
+    	    ddblock_diagnostic "Extracting block using ddblock tag $TAG in $TARGET"
+    	    ddblockex $TARGET $TAG $EXTRACT_PREFIX
+    	fi
+    else
+        # TARGET is a directory. Recursively process all the files in
+        # the target directory. Earlier implementation using "find"
+        # command has been replaced with using DICE utilities dxtrex
+        # and dxdiex. A subpack ddblock_subpack has been included to
+        # faciliate this.
+	
+	dxpushd $TARGET
+    	if [ "$MODE" = "replace" ]; then	    
+    	    ddblock_diagnostic "Updating block using ddblock tag $TAG in $TARGET"
+	    ddblockupt $TAG $BLOCKPATH $TMPPATH
+    	else
+    	    ddblock_diagnostic "Extracting block using ddblock tag $TAG in $TARGET"
+	    ddblockext $TAG $EXTRACT_PREFIX
+   	fi
+	dxpopd
+    fi
+    
+    ddblock_diagnostic "Done processing tag "$TAG" from the specifed "${#TAGS[@]}" tags: "${TAGS[*]}""
+done
